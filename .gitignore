@@ -46,3 +46,9 @@ replay_pid*
 
 # Spécifique macOS (recommandé)
 .DS_Store
+
+**/*.classpath
+**/*.factorypath
+**/*.project
+ .gitignore
+**/*.gitignore
