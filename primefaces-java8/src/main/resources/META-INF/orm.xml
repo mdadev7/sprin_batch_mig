@@ -1,0 +1,23 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-mappings
+    xmlns="http://xmlns.jcp.org/xml/ns/persistence/orm"
+    version="2.2">
+
+    <entity class="com.example.legacy.entity.Person"
+            access="FIELD">
+
+        <attributes>
+
+            <basic name="salaire">
+                <column name="salaire_encrypted"/>
+                <convert converter=
+                    "com.example.legacy.converter.FloatCryptedConverter"/>
+            </basic>
+
+        </attributes>
+
+    </entity>
+
+</entity-mappings>

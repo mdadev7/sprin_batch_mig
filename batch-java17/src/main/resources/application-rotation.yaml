@@ -1,0 +1,13 @@
+crypto:
+  current-version: v2
+  versions:
+    v1:
+      transformation: AES/GCM/NoPadding
+      key-environment-variable: APP_CRYPTO_KEY
+      iv-length: 12
+      tag-length: 128
+    v2:
+      transformation: AES/GCM/NoPadding
+      key-environment-variable: APP_CRYPTO_KEY_V2
+      iv-length: 12
+      tag-length: 128

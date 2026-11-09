@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:f="http://java.sun.com/jsf/core"
+      xmlns:p="http://primefaces.org/ui">
+
+<h:head>
+    <title>Suivi des exécutions de batch</title>
+</h:head>
+
+<h:body>
+    <h:form id="batchListForm">
+
+        <p:growl id="growl" life="3000"/>
+
+        <!-- ================= Filtres ================= -->
+        <p:panel header="Filtres de recherche" style="margin-bottom: 1.5em">
+            <p:grid columns="4" style="margin-bottom: 1em">
+                <p:outputLabel for="jobExecutionId" value="ID exécution :"/>
+                <p:inputText id="jobExecutionId"
+                             value="#{batchListBean.jobExecutionIdFilter}"
+                             placeholder="Ex: 123"/>
+
+                <p:outputLabel for="status" value="Statut :"/>
+                <p:selectOneMenu id="status"
+                                 value="#{batchListBean.statusFilter}">
+                    <f:selectItem itemLabel="Tous" itemValue=""/>
+                    <f:selectItem itemLabel="Terminé" itemValue="COMPLETED"/>
+                    <f:selectItem itemLabel="Échec" itemValue="FAILED"/>
+                    <f:selectItem itemLabel="Arrêté" itemValue="STOPPED"/>
+                    <f:selectItem itemLabel="En cours" itemValue="STARTED"/>
+                    <p:ajax event="change" update="batchListForm"
+                            listener="#{batchListBean.filter}"/>
+                </p:selectOneMenu>
+
+                <p:outputLabel for="dateFrom" value="Du :"/>
+                <p:calendar id="dateFrom"
+                            value="#{batchListBean.dateFromFilter}"
+                            pattern="dd/MM/yyyy"
+                            navigator="true"/>
+
+                <p:outputLabel for="dateTo" value="Au :"/>
+                <p:calendar id="dateTo"
+                            value="#{batchListBean.dateToFilter}"
+                            pattern="dd/MM/yyyy"
+                            navigator="true"/>
+
+                <p:outputLabel for="exitCode" value="Code sortie :"/>
+                <p:inputText id="exitCode"
+                             value="#{batchListBean.exitCodeFilter}"
+                             placeholder="Ex: COMPLETED"/>
+
+                <p:outputLabel for="keyword" value="Mot-clé (message) :"/>
+                <p:inputText id="keyword"
+                             value="#{batchListBean.keywordFilter}"
+                             placeholder="Recherche dans le message d'erreur"/>
+            </p:grid>
+
+            <p:toolbar style="margin-top: 1em">
+                <p:toolbarGroup>
+                    <p:commandButton value="Rechercher"
+                                     icon="pi pi-search"
+                                     update="batchListForm"
+                                     action="#{batchListBean.filter}"/>
+                    <p:commandButton value="Effacer"
+                                     icon="pi pi-times"
+                                     update="batchListForm"
+                                     action="#{batchListBean.clearFilters}"
+                                     styleClass="ui-button-secondary"/>
+                </p:toolbarGroup>
+                <p:toolbarGroup align="right">
+                    <p:commandButton value="Rafraîchir"
+                                     icon="pi pi-refresh"
+                                     update="batchListForm"
+                                     action="#{batchListBean.refresh}"/>
+                </p:toolbarGroup>
+            </p:toolbar>
+        </p:panel>
+
+        <!-- ================= Liste des exécutions ================= -->
+        <p:panel header="Exécutions de batch (#{batchListBean.totalCount} résultat#{batchListBean.totalCount > 1 ? 's' : ''})"
+                 style="margin-bottom: 1.5em">
+
+            <p:dataTable id="executionsTable"
+                         value="#{batchListBean.executions}"
+                         var="e"
+                         rows="#{batchListBean.pageSize}"
+                         first="#{batchListBean.first}"
+                         paginator="true"
+                         paginatorPosition="bottom"
+                         paginatorTemplate="{FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+                         rowsPerPageTemplate="10,20,50,100"
+                         sortMode="multiple"
+                         emptyMessage="Aucune exécution trouvée"
+                         rowKey="#{e.id}"
+                         selectionMode="single"
+                         selection="#{batchListBean.selected}"
+                         lazy="false">
+
+                <p:ajax event="rowSelect"
+                        listener="#{batchListBean.onRowSelect}"
+                        update=":batchListForm:detailButton"/>
+
+                <p:column headerText="ID" sortBy="#{e.id}" width="70">
+                    #{e.id}
+                </p:column>
+
+                <p:column headerText="Statut" sortBy="#{e.status}" width="120">
+                    <p:tag value="#{batchListBean.statusLabel(e.status)}"
+                           severity="#{batchListBean.severityOf(e.status)}"/>
+                </p:column>
+
+                <p:column headerText="Début" width="160">
+                    <h:outputText value="#{e.startTime}">
+                        <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
+                    </h:outputText>
+                </p:column>
+
+                <p:column headerText="Fin" width="160">
+                    <h:outputText value="#{e.endTime}">
+                        <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
+                    </h:outputText>
+                </p:column>
+
+                <p:column headerText="Durée" width="100">
+                    #{batchListBean.durationOf(e)}
+                </p:column>
+
+                <p:column headerText="Code de sortie" width="130">
+                    <p:tag value="#{e.exitCode}"
+                           severity="#{e.exitCode == 'COMPLETED' ? 'success' : 'danger'}"/>
+                </p:column>
+
+                <p:column headerText="Message" style="max-width: 400px">
+                    <h:outputText value="#{batchListBean.truncate(e.exitMessage, 120)}"
+                                  title="#{e.exitMessage}"/>
+                </p:column>
+
+                <p:column headerText="" width="100">
+                    <p:commandButton value="Détail"
+                                     icon="pi pi-search"
+                                     action="#{batchListBean.viewDetail(e.id)}"
+                                     ajax="false"
+                                     styleClass="ui-button-info"/>
+                </p:column>
+            </p:dataTable>
+
+            <!-- Pagination info -->
+            <p:outputPanel style="text-align: center; margin-top: 1em">
+                <h:outputText value="Affichage de #{batchListBean.startRecord} à #{batchListBean.endRecord} sur #{batchListBean.totalCount}" rendered="#{not empty batchListBean.executions}"/>
+            </p:outputPanel>
+
+            <p:commandButton id="detailButton"
+                             value="Ouvrir le détail sélectionné"
+                             icon="pi pi-external-link"
+                             disabled="#{empty batchListBean.selected}"
+                             action="#{batchListBean.viewSelected}"
+                             ajax="false"
+                             style="margin-top: 1em"/>
+        </p:panel>
+    </h:form>
+</h:body>
+</html>

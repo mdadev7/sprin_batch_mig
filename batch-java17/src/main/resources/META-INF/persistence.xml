@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             version="3.1">
+
+    <persistence-unit name="myPU"
+                      transaction-type="RESOURCE_LOCAL">
+
+        <provider>
+            org.hibernate.jpa.HibernatePersistenceProvider
+        </provider>
+
+        <class>com.example.legacy.entity.Person</class>
+
+        <properties> 
+            <property name="jakarta.persistence.jdbc.driver"
+                      value="${DB_Driver}"/>
+
+            <property name="jakarta.persistence.jdbc.url"
+                      value="${DB_URL}"/>
+
+            <property name="jakarta.persistence.jdbc.user"
+                      value="${DB_USERNAME}"/>
+
+            <property name="jakarta.persistence.jdbc.password"
+                      value="${DB_PASSWORD}"/>
+
+            <property name="hibernate.dialect"
+                      value="${hibernate.dialect}"/>
+
+            <property name="hibernate.show_sql"
+                      value="${hibernate.show_sql}"/>
+
+            <property name="hibernate.format_sql"
+                      value="${hibernate.format_sql}"/>
+
+            <property name="hibernate.hbm2ddl.auto"
+                      value="${hibernate.hbm2ddl.auto}"/>
+
+        </properties>
+
+    </persistence-unit>
+
+</persistence>

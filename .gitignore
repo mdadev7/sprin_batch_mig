@@ -22,3 +22,27 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Ignorer tous les fichiers .env, peu importe leur dossier (racine ou sous-dossiers)
+**/env
+**/.env
+**/.env.*
+**/env.key
+
+# Ignorer tous les fichiers contenant "properties" ou des mots de passe/secrets, à n'importe quel niveau
+**/*properties*
+**/*password*
+**/*secret*
+# Dossiers de compilation et binaires (Maven, Java, IDEs)
+**/target/
+**/bin/
+
+# Dossiers et fichiers temporaires
+**/tmp/
+**/temp/
+**/*.tmp
+**/*.temp
+**/*.log
+
+# Spécifique macOS (recommandé)
+.DS_Store

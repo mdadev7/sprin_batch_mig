@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:f="http://java.sun.com/jsf/core"
+      xmlns:p="http://primefaces.org/ui">
+
+<h:head>
+    <title>Détail de l'exécution de batch</title>
+</h:head>
+
+<h:body>
+    <h:form id="detailForm">
+
+        <p:growl id="growl" life="3000"/>
+
+        <p:breadCrumb style="margin-bottom: 1em">
+            <p:menuitem value="Exécutions"
+                        action="#{batchDetailBean.backToList}"
+                        ajax="false"
+                        icon="pi pi-list"/>
+            <p:menuitem value="Exécution ##{batchDetailBean.id}"
+                        disabled="true"/>
+        </p:breadCrumb>
+
+        <!-- ================= Aucun résultat ================= -->
+        <h:panelGroup rendered="#{empty batchDetailBean.execution}">
+            <p:message severity="warn"
+                       text="Exécution introuvable pour cet identifiant."/>
+        </h:panelGroup>
+
+        <!-- ================= Détail ================= -->
+        <h:panelGroup rendered="#{not empty batchDetailBean.execution}">
+
+            <!-- ---------- En-tête ---------- -->
+            <p:panel header="Informations générales" style="margin-bottom: 1em">
+                <p:panelGrid columns="4"
+                             layout="grid"
+                             columnClasses="label,value,label,value"
+                             style="width: 100%">
+
+                    <h:outputText value="ID :"/>
+                    <h:outputText value="#{batchDetailBean.execution.id}"/>
+
+                    <h:outputText value="Statut :"/>
+                    <p:tag value="#{batchDetailBean.execution.status}"
+                           severity="#{batchDetailBean.severityOf(batchDetailBean.execution.status)}"/>
+
+                    <h:outputText value="Début :"/>
+                    <h:outputText value="#{batchDetailBean.startTimeFormatted}"/>
+
+                    <h:outputText value="Fin :"/>
+                    <h:outputText value="#{batchDetailBean.endTimeFormatted}"/>
+
+                    <h:outputText value="Durée :"/>
+                    <h:outputText value="#{batchDetailBean.duration}"/>
+
+                    <h:outputText value="Code de sortie :"/>
+                    <p:tag value="#{batchDetailBean.execution.exitCode}"
+                           severity="#{batchDetailBean.execution.exitCode == 'COMPLETED' ? 'success' : 'danger'}"/>
+
+                    <h:outputText value="Job :"/>
+                    <h:outputText value="#{batchDetailBean.execution.jobName}"/>
+
+                    <h:outputText value="Message :"/>
+                    <h:outputText value="#{batchDetailBean.truncate(batchDetailBean.execution.exitMessage, 200)}"
+                                  title="#{batchDetailBean.execution.exitMessage}"
+                                  style="word-break: break-all"/>
+                </p:panelGrid>
+            </p:panel>
+
+            <!-- ---------- Compteurs agrégés ---------- -->
+            <p:panel header="Compteurs agrégés" style="margin-bottom: 1em">
+                <p:panelGrid columns="4"
+                             layout="grid"
+                             style="width: 100%">
+
+                    <p:card>
+                        <f:facet name="title">Lignes lues</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.readCount}</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Lignes écrites</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.writeCount}</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Taux de succès</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.successRate}%</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Total rejets</f:facet>
+                        <h2 style="margin:0; color:#c0392b">
+                            #{batchDetailBean.counters.totalSkips}
+                        </h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Rejets lecture</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.readSkip}</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Rejets traitement</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.processSkip}</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Rejets écriture</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.writeSkip}</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Commits</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.commits}</h2>
+                    </p:card>
+
+                    <p:card>
+                        <f:facet name="title">Rollbacks</f:facet>
+                        <h2 style="margin:0">#{batchDetailBean.counters.rollbacks}</h2>
+                    </p:card>
+                </p:panelGrid>
+            </p:panel>
+
+            <!-- ---------- Détail par étape ---------- -->
+            <p:panel header="Détail par étape (partitions)" style="margin-bottom: 1em">
+                <p:dataTable value="#{batchDetailBean.steps}"
+                             var="s"
+                             emptyMessage="Aucune étape enregistrée"
+                             rowKey="#{s.id}">
+
+                    <p:column headerText="Étape" sortBy="#{s.stepName}" style="min-width: 220px">
+                        #{s.stepName}
+                    </p:column>
+
+                    <p:column headerText="Statut" sortBy="#{s.status}" width="130">
+                        <p:tag value="#{s.status}"
+                               severity="#{batchDetailBean.severityOf(s.status)}"/>
+                    </p:column>
+
+                    <p:column headerText="Début" width="170">
+                        <h:outputText value="#{s.startTime}">
+                            <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
+                        </h:outputText>
+                    </p:column>
+
+                    <p:column headerText="Fin" width="170">
+                        <h:outputText value="#{s.endTime}">
+                            <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
+                        </h:outputText>
+                    </p:column>
+
+                    <p:column headerText="Durée" width="100" styleClass="num" style="text-align:right">
+                        <h:outputText value="#{s.durationSeconds} s"/>
+                    </p:column>
+
+                    <p:column headerText="Lues" styleClass="num" style="text-align:right">
+                        #{s.readCount}
+                    </p:column>
+
+                    <p:column headerText="Écrites" styleClass="num" style="text-align:right">
+                        #{s.writeCount}
+                    </p:column>
+
+                    <p:column headerText="Commits" styleClass="num" style="text-align:right">
+                        #{s.commitCount}
+                    </p:column>
+
+                    <p:column headerText="Rollbacks" styleClass="num" style="text-align:right">
+                        #{s.rollbackCount}
+                    </p:column>
+
+                    <p:column headerText="Rej. lecture" styleClass="num" style="text-align:right">
+                        #{s.readSkipCount}
+                    </p:column>
+
+                    <p:column headerText="Rej. traitement" styleClass="num" style="text-align:right">
+                        #{s.processSkipCount}
+                    </p:column>
+
+                    <p:column headerText="Rej. écriture" styleClass="num" style="text-align:right">
+                        #{s.writeSkipCount}
+                    </p:column>
+
+                    <p:column headerText="Code de sortie" width="130">
+                        <p:tag value="#{s.exitCode}"
+                               severity="#{s.exitCode == 'COMPLETED' ? 'success' : 'danger'}"/>
+                    </p:column>
+
+                    <p:column headerText="Message" style="max-width: 380px">
+                        <h:outputText value="#{batchDetailBean.truncate(s.exitMessage, 120)}"
+                                      title="#{s.exitMessage}"/>
+                    </p:column>
+                </p:dataTable>
+            </p:panel>
+
+            <!-- ---------- Rejets détaillés ---------- -->
+            <h:panelGroup rendered="#{batchDetailBean.hasRejections()}">
+                <p:panel header="Lignes rejetées (détail)" style="margin-bottom: 1em">
+                    <p:dataTable value="#{batchDetailBean.rejections}"
+                                 var="r"
+                                 rows="20"
+                                 paginator="true"
+                                 emptyMessage="Aucun rejet">
+
+                        <p:column headerText="Ligne CSV" width="100">
+                            #{r.lineNumber}
+                        </p:column>
+
+                        <p:column headerText="Contenu CSV" style="max-width: 400px">
+                            <h:outputText value="#{r.rawContent}"/>
+                        </p:column>
+
+                        <p:column headerText="Étape" width="150">
+                            #{r.stepName}
+                        </p:column>
+
+                        <p:column headerText="Motif" width="300">
+                            <h:outputText value="#{r.reason}"/>
+                        </p:column>
+
+                        <p:column headerText="Date" width="170">
+                            <h:outputText value="#{r.rejectionDate}">
+                                <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
+                            </h:outputText>
+                        </p:column>
+                    </p:dataTable>
+                </p:panel>
+            </h:panelGroup>
+
+            <h:panelGroup rendered="#{not batchDetailBean.hasRejections()}">
+                <p:messages severity="info"
+                            closable="false"
+                            showDetail="false"
+                            rendered="true"
+                            style="display:block; margin-bottom:1em">
+                    <p:message severity="info"
+                               text="Aucun rejet enregistré pour cette exécution."/>
+                </p:messages>
+            </h:panelGroup>
+
+            <p:commandButton value="Retour à la liste"
+                             icon="pi pi-arrow-left"
+                             action="#{batchDetailBean.backToList}"
+                             ajax="false"
+                             style="margin-top: 1em"/>
+        </h:panelGroup>
+    </h:form>
+</h:body>
+</html>
