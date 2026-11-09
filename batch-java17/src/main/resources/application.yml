@@ -4,9 +4,9 @@ spring:
   config:
     import: "optional:classpath:batch-config.properties"
   datasource:
-    url: ${DB_URL:jdbc:mariadb://localhost:3307/dotations_db?useUnicode=true&characterEncoding=UTF-8}
-    username: ${DB_USERNAME:devuser}
-    password: ${DB_PASSWORD:dev159357}
+    url: ${DB_URL:jdbc:mariadb://localhost:3307/mydev_db?useUnicode=true&characterEncoding=UTF-8}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       maximum-pool-size: 12
