@@ -1,9 +1,19 @@
 # Spécification technique et fonctionnelle
 ## Migration d'un fichier texte vers une base de données avec Spring Boot, Spring Batch et chiffrement modulaire
 
-**Version** : 1.1
-**Statut** : Proposition consolidée
-**Date** : 2026-11-09
+**Version** : 1.2
+**Statut** : Proposition consolidée (points 1 et 2 conclus)
+**Date** : 2026-11-12
+
+---
+
+## 0. Historique des évolutions
+
+| Version | Date | Évolution |
+|---|---|---|
+| 1.0 | 2026-11-08 | Version initiale |
+| 1.1 | 2026-11-09 | Consolidation architecture (crypto-core, batch partitionné, UI PrimeFaces) |
+| 1.2 | 2026-11-12 | **Conclusion des points 1 et 2** : enregistrement des rejets + détection de doublons (RG3 étendu) ; exploitation web des tables `batch_*` (pagination, filtres multi-critères, consultation des rejets) |
 
 ---
 
@@ -71,6 +81,7 @@ id;nom;prenom;salaire;date_naissance;ville
 | RG1 | Ligne vide | Ignorée silencieusement |
 | RG2 | Moins de 6 colonnes | Rejetée, comptée en erreur |
 | RG3 | `id` en doublon dans le fichier | Rejetée (contrainte PK en base) |
+| RG3bis | Doublon (nom, prénom, date naissance, ville) | Rejetée, même si l'`id` diffère. Détectée par `DuplicateChecker` (store `ConcurrentHashMap` partagé entre les 8 workers) |
 | RG4 | `salaire` non numérique | Rejetée, comptée en erreur |
 | RG5 | `date_naissance` non parsable | Rejetée, comptée en erreur |
 | RG6 | Chiffrement du salaire avant insertion | Obligatoire |
@@ -99,6 +110,9 @@ Accessible via les tables Spring Batch (`BATCH_JOB_EXECUTION`, `BATCH_STEP_EXECU
 | CAF5 | Un salaire modifié dans l'UI est relisible par le batch | Test croisé |
 | CAF6 | 1M lignes migrées en < 30 s | Chronométrage (mesuré : 13,5 s) |
 | CAF7 | Les 8 partitions ont des durées à ±5 % | Logs `BATCH_STEP_EXECUTION` |
+| CAF8 | Doublon (nom/prénom/date/ville) rejeté | `SELECT COUNT(*) FROM person_rejection WHERE reason LIKE '%Doublon%'` |
+| CAF9 | ID non numérique rejeté et compté | `SELECT COUNT(*) FROM person_rejection WHERE reason LIKE '%non numérique%'` |
+| CAF10 | Les rejets sont visibles dans l'UI (onglet "Lignes rejetées") | Navigation UI sur `batch-execution-detail.xhtml` |
 
 ---
 
@@ -194,10 +208,11 @@ Chaque worker a **son propre `ItemReader`** (`@StepScope`), ce qui élimine tout
 | Composant | Type | Rôle |
 |---|---|---|
 | `LineRangePartitioner` | `Partitioner` | Compte les lignes via `DefaultResourceLoader`, crée 8 `ExecutionContext` `{startLine, endLine}` |
-| `LineRangeFlatFileReader` | `ItemStreamReader<PersonCsv>` | Lit une plage, via `InputStream` (compatible `classpath:` et JAR) |
-| `PersonRowProcessor` | `ItemProcessor<PersonCsv, PersonRow>` | Mappe et **chiffre explicitement** le salaire |
+| `LineRangeFlatFileReader` | `ItemStreamReader<PersonCsv>` | Lit une plage, via `InputStream` (compatible `classpath:` et JAR). Lance `IllegalArgumentException` (skippable) pour erreurs de parsing (ID non numérique, moins de 6 colonnes) |
+| `PersonRowProcessor` | `ItemProcessor<PersonCsv, PersonRow>` | Mappe et **chiffre explicitement** le salaire. Vérifie aussi les doublons (RG3bis) via `DuplicateChecker` |
+| `DuplicateChecker` | `Component` | Store `ConcurrentHashMap` partagé entre les 8 workers. Clé normalisée : `nom|prenom|dateNaissance|ville`. `isDuplicate()` retourne true si la clé a déjà été vue |
 | `PersonJdbcWriter` | `JdbcBatchItemWriter<PersonRow>` | Insertion JDBC batchée |
-| `PersonSkipListener` | `SkipListener` | Loggue les rejets (RG4, RG5) |
+| `PersonSkipListener` | `SkipListener` + `StepExecutionListener` | Insère chaque rejet dans `person_rejection` avec `job_execution_id`, `step_name`, `partition_id` (depuis le contexte d'étape), `line_number` (depuis `PersonCsv`), `raw_content`, `reason` |
 
 #### 3.3.3 Paramètres d'exécution
 
@@ -266,6 +281,11 @@ batch:
   retry-limit: 3
 ```
 
+**Fichier `batch-config.properties`** (développement uniquement, jamais versionné) :
+- Contient `APP_CRYPTO_KEY` (clé Base64 44 caractères), `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
+- Injecté via `BatchApplication` static initializer → `System.setProperty`
+- En production : variable d'environnement OS (`APP_CRYPTO_KEY`, `DB_URL`, etc.)
+
 #### 3.3.6 Configuration des beans
 
 `CryptoConfiguration` :
@@ -323,14 +343,21 @@ Deux pages XHTML lisant les tables `BATCH_*` en **lecture seule** :
 
 | Page | Contenu |
 |---|---|
-| `batch-executions.xhtml` | 50 dernières exécutions (`ID`, `Statut`, `Début`, `Fin`, `Durée`, `Code sortie`, `Message`), filtre par statut, tri, pagination, sélection → détail |
-| `batch-execution-detail.xhtml` | En-tête (statut, durées, code sortie, message), 9 cartes de compteurs agrégés (lues, écrites, taux de succès, rejets lecture/traitement/écriture, commits, rollbacks, total rejets), tableau des 9 étapes (`masterStep` + 8 `workerStep:partition-N`) avec compteurs détaillés |
+| `batch-executions.xhtml` | Liste paginée (10/20/50/100 par page) des exécutions avec filtres multi-critères : ID, statut (COMPLETED/FAILED/STOPPED/STARTED), dates (du/au), code sortie, mot-clé dans le message. Tri multiple, sélection ligne → détail |
+| `batch-execution-detail.xhtml` | En-tête (statut, durées, code sortie, message), 9 cartes de compteurs agrégés (lues, écrites, taux de succès, rejets lecture/traitement/écriture, commits, rollbacks, total rejets), tableau des 9 étapes (`masterStep` + 8 `workerStep:partition-N`) avec compteurs détaillés, et tableau paginé des rejets (ligne CSV, contenu, étape, motif, date) |
 
-**Entités JPA** (lecture seule) : `BatchJobExecution`, `BatchStepExecution` (mappées sur `BATCH_JOB_EXECUTION`, `BATCH_STEP_EXECUTION`).
+**Entités JPA** (lecture seule) : `BatchJobExecution`, `BatchStepExecution`, `BatchCounters`, `PersonRejection` (mappées sur `BATCH_JOB_EXECUTION`, `BATCH_STEP_EXECUTION`, `person_rejection`).
 
-**DAO** : `findRecentExecutions(limit)`, `findExecution(id)`, `findSteps(jobExecutionId)`, `aggregate(jobExecutionId)`.
+**DAO** (`BatchConsultationDao`) :
+- `findExecutions(id, status, dateFrom, dateTo, exitCode, keyword, first, pageSize)` — JPA Criteria paginé et filtré
+- `countExecutions(...)` — count avec les mêmes filtres (pour pagination)
+- `findExecution(id)` — lecture d'une exécution
+- `findSteps(jobExecutionId)` — étapes d'une exécution, triées par `startTime`
+- `aggregate(jobExecutionId)` — compteurs agrégés (readCount, writeCount, readSkip, processSkip, writeSkip, commits, rollbacks)
+- `findRejections(jobExecutionId)` — rejets d'une exécution, triés par `rejectionDate` DESC
+- `findRejectionsByStep(jobExecutionId, stepName)` — rejets d'une étape spécifique
 
-**Beans JSF** : `BatchListBean`, `BatchDetailBean` (helpers `durationOf`, `severityOf`, `truncate`).
+**Beans JSF** : `BatchListBean` (liste, filtres, pagination, helpers `durationOf`, `severityOf`, `truncate`), `BatchDetailBean` (détail, compteurs, rejets, helpers `severityOf`, `truncate`, `hasRejections`).
 
 ### 3.5 Modèle de données
 
@@ -352,6 +379,46 @@ CREATE TABLE person (
 #### 3.5.2 Tables Spring Batch
 
 Créées par Flyway (`V2__batch_schema.sql`), **jamais** par `initialize-schema: always` en production. Aucune modification manuelle.
+
+#### 3.5.3 Table `person_rejection` (traçabilité des rejets)
+
+Créée par Flyway (`V3__person_rejection.sql`). Chaque ligne rejetée par le batch y est enregistrée par le `PersonSkipListener`.
+
+```sql
+CREATE TABLE person_rejection (
+    id               BIGINT       NOT NULL AUTO_INCREMENT,
+    job_execution_id BIGINT       NOT NULL,
+    step_name        VARCHAR(100) NOT NULL,
+    partition_id     VARCHAR(50),
+    line_number      BIGINT,
+    raw_content      TEXT,
+    reason           VARCHAR(1000),
+    rejection_date   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    PRIMARY KEY (id),
+    CONSTRAINT FK_REJECTION_JOB_EXEC
+        FOREIGN KEY (job_execution_id)
+        REFERENCES BATCH_JOB_EXECUTION(JOB_EXECUTION_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX IDX_REJECTION_JOB ON person_rejection(job_execution_id);
+CREATE INDEX IDX_REJECTION_STEP ON person_rejection(step_name);
+CREATE INDEX IDX_REJECTION_DATE ON person_rejection(rejection_date);
+```
+
+| Colonne | Origine |
+|---|---|
+| `job_execution_id` | `BATCH_JOB_EXECUTION.JOB_EXECUTION_ID` (FK) |
+| `step_name` | Nom de l'étape `workerStep` |
+| `partition_id` | `partition-0` … `partition-7` (depuis le contexte d'étape) |
+| `line_number` | Numéro de ligne dans le CSV source (depuis `PersonCsv.lineNumber`) |
+| `raw_content` | Contenu brut de la ligne CSV (reconstruit pour les rejets de traitement) |
+| `reason` | Message de l'exception (ex: `ID non numérique`, `Doublon (nom/prénom/date/ville)`) |
+| `rejection_date` | Horodatage de l'enregistrement |
+
+**Lecture** : L'UI PrimeFaces (`BatchDetailBean`) affiche les rejets d'une exécution dans un tableau paginé (20 par page).
+
+**Sécurité** : L'insertion est encapsulée dans un `try/catch` — un échec d'enregistrement du rejet ne doit jamais faire échouer le batch.
 
 ### 3.6 Gestion de la clé
 
@@ -574,9 +641,12 @@ Procédure avec `RotatingCryptoService` :
 | Projet `primefaces-java8` (converter + UI batch) | WAR | Équipe legacy |
 | Schéma SQL `person` | Script Flyway `V1__person.sql` | Équipe batch |
 | Schéma SQL `BATCH_*` | Script Flyway `V2__batch_schema.sql` | Équipe batch |
+| Schéma SQL `person_rejection` | Script Flyway `V3__person_rejection.sql` | Équipe batch |
+| `DuplicateChecker` | Java (batch) | Équipe batch |
 | Pages `batch-executions.xhtml`, `batch-execution-detail.xhtml` | XHTML | Équipe legacy |
 | Beans `BatchListBean`, `BatchDetailBean`, DAO | Java | Équipe legacy |
-| `PersonSkipListener` + table `person_rejection` | Java + SQL | Équipe batch |
+| Entités JPA `BatchJobExecution`, `BatchStepExecution`, `BatchCounters`, `PersonRejection` | Java | Équipe legacy |
+| `PersonSkipListener` | Java | Équipe batch |
 | Procédure de déploiement | Document | DevOps |
 | Procédure de rotation de clé | Document | Sécurité + DevOps |
 | Rapport de test de compatibilité | Document | QA |
