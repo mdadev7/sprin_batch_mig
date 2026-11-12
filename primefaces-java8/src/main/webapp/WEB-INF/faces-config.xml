@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<faces-config
+    xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
+    http://xmlns.jcp.org/xml/ns/javaee/web-facesconfig_2_2.xsd"
+    version="2.2">
+
+    <managed-bean>
+        <managed-bean-name>batchConsultationDao</managed-bean-name>
+        <managed-bean-class>com.example.legacy.batch.BatchConsultationDao</managed-bean-class>
+        <managed-bean-scope>application</managed-bean-scope>
+    </managed-bean>
+
+    <managed-bean>
+        <managed-bean-name>batchListBean</managed-bean-name>
+        <managed-bean-class>com.example.legacy.bean.BatchListBean</managed-bean-class>
+        <managed-bean-scope>view</managed-bean-scope>
+        <managed-property>
+            <property-name>dao</property-name>
+            <value>#{batchConsultationDao}</value>
+        </managed-property>
+    </managed-bean>
+
+    <managed-bean>
+        <managed-bean-name>batchDetailBean</managed-bean-name>
+        <managed-bean-class>com.example.legacy.bean.BatchDetailBean</managed-bean-class>
+        <managed-bean-scope>view</managed-bean-scope>
+        <managed-property>
+            <property-name>dao</property-name>
+            <value>#{batchConsultationDao}</value>
+        </managed-property>
+    </managed-bean>
+
+</faces-config>

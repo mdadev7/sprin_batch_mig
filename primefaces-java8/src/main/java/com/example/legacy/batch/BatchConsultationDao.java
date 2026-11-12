@@ -1,12 +1,12 @@
 package com.example.legacy.batch;
 
 import javax.faces.bean.ManagedBean;
-import javax.persistencecriteria.CriteriaBuilder;
-import javax.persistence.CriteriaQuery;
 import javax.persistence.EntityTransaction;
-import javax.persistence.Predicate;
-import javax.persistence.Root;
 import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -24,7 +24,7 @@ public class BatchConsultationDao {
 
     private static final String PU = "legacyPU";
 
-    private javax.persistence EntityManager getManager() {
+    private javax.persistence.EntityManager getManager() {
         return javax.persistence.Persistence
                 .createEntityManagerFactory(PU)
                 .createEntityManager();
@@ -43,7 +43,7 @@ public class BatchConsultationDao {
             int first,
             int pageSize) {
 
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<BatchJobExecution> cq = cb.createQuery(BatchJobExecution.class);
@@ -75,7 +75,7 @@ public class BatchConsultationDao {
             String exitCode,
             String keyword) {
 
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<Long> cq = cb.createQuery(Long.class);
@@ -95,7 +95,7 @@ public class BatchConsultationDao {
      * Retourne une exécution par son identifiant.
      */
     public BatchJobExecution findExecution(Long id) {
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             return em.find(BatchJobExecution.class, id);
         } finally {
@@ -107,7 +107,7 @@ public class BatchConsultationDao {
      * Retourne les étapes d'une exécution, triées par heure de début.
      */
     public List<BatchStepExecution> findSteps(Long jobExecutionId) {
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             TypedQuery<BatchStepExecution> q = em.createQuery(
                 "SELECT s FROM BatchStepExecution s " +
@@ -124,7 +124,7 @@ public class BatchConsultationDao {
      * Calcule les compteurs agrégés pour une exécution.
      */
     public BatchCounters aggregate(Long jobExecutionId) {
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             Object[] r = (Object[]) em.createQuery(
                 "SELECT COALESCE(SUM(s.readCount),0), " +
@@ -156,7 +156,7 @@ public class BatchConsultationDao {
      * Retourne les rejets d'une exécution.
      */
     public List<PersonRejection> findRejections(Long jobExecutionId) {
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             TypedQuery<PersonRejection> q = em.createQuery(
                 "SELECT r FROM PersonRejection r " +
@@ -173,7 +173,7 @@ public class BatchConsultationDao {
      * Retourne les rejets d'une étape spécifique.
      */
     public List<PersonRejection> findRejectionsByStep(Long jobExecutionId, String stepName) {
-        javax.persistence EntityManager em = getManager();
+        javax.persistence.EntityManager em = getManager();
         try {
             TypedQuery<PersonRejection> q = em.createQuery(
                 "SELECT r FROM PersonRejection r " +
