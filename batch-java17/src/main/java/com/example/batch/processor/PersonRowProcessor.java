@@ -1,5 +1,6 @@
 package com.example.batch.processor;
 
+import com.example.batch.duplicate.DuplicateChecker;
 import com.example.batch.model.PersonCsv;
 import com.example.batch.model.PersonRow;
 import com.example.crypto.CryptoService;
@@ -18,13 +19,16 @@ public class PersonRowProcessor
         implements ItemProcessor<PersonCsv, PersonRow> {
 
     private final CryptoService cryptoService;
+    private final DuplicateChecker duplicateChecker;
 
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("dd/MM/uuuu")
                     .withResolverStyle(ResolverStyle.STRICT);
 
-    public PersonRowProcessor(CryptoService cryptoService) {
+    public PersonRowProcessor(CryptoService cryptoService,
+                              DuplicateChecker duplicateChecker) {
         this.cryptoService = cryptoService;
+        this.duplicateChecker = duplicateChecker;
     }
 
     @Override
@@ -63,6 +67,19 @@ public class PersonRowProcessor
                     && csv.getVille().length() > 100) {
                 throw new IllegalArgumentException(
                         "Ville trop longue");
+            }
+
+            // --- Détection de doublon (RG3 étendu) ---
+            // Une ligne est un doublon si la combinaison
+            // (nom, prénom, date_naissance, ville) a déjà été vue.
+            if (duplicateChecker.isDuplicate(
+                    nom, prenom, csv.getDateNaissance(),
+                    csv.getVille())) {
+                throw new IllegalArgumentException(
+                        "Doublon (nom/prénom/date/ville) : "
+                        + nom + " " + prenom + " "
+                        + csv.getDateNaissance() + " "
+                        + csv.getVille());
             }
 
             PersonRow row = new PersonRow();

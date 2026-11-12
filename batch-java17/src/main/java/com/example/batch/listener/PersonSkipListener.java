@@ -21,6 +21,7 @@ public class PersonSkipListener
 
     private Long jobExecutionId;
     private String stepName;
+    private String partitionId;
 
     public PersonSkipListener(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -30,6 +31,12 @@ public class PersonSkipListener
     public void beforeStep(StepExecution stepExecution) {
         this.jobExecutionId = stepExecution.getJobExecution().getId();
         this.stepName = stepExecution.getStepName();
+        // Récupère l'ID de partition depuis le contexte d'exécution
+        this.partitionId = stepExecution.getExecutionContext()
+                .getString("partitionId");
+        if (this.partitionId == null) {
+            this.partitionId = stepExecution.getStepName();
+        }
     }
 
     @Override
@@ -44,7 +51,8 @@ public class PersonSkipListener
             return;
         }
         String rawContent = toCsvLine(item);
-        insertRejection(item.getId(), rawContent, null, t.getMessage());
+        Long lineNo = item.getLineNumber();
+        insertRejection(lineNo != null ? lineNo : 0, rawContent, null, t.getMessage());
     }
 
     @Override

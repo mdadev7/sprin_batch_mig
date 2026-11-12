@@ -8,6 +8,7 @@ public class PersonCsv {
     private String salaire;
     private String dateNaissance;
     private String ville;
+    private Long lineNumber;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -19,18 +20,14 @@ public class PersonCsv {
     public void setPrenom(String prenom) { this.prenom = prenom; }
 
     public String getSalaire() { return salaire; }
-    public void setSalaire(String salaire) {
-        this.salaire = salaire;
-    }
+    public void setSalaire(String salaire) { this.salaire = salaire; }
 
-    public String getDateNaissance() {
-        return dateNaissance;
-    }
-
-    public void setDateNaissance(String dateNaissance) {
-        this.dateNaissance = dateNaissance;
-    }
+    public String getDateNaissance() { return dateNaissance; }
+    public void setDateNaissance(String dateNaissance) { this.dateNaissance = dateNaissance; }
 
     public String getVille() { return ville; }
     public void setVille(String ville) { this.ville = ville; }
+
+    public Long getLineNumber() { return lineNumber; }
+    public void setLineNumber(Long lineNumber) { this.lineNumber = lineNumber; }
 }

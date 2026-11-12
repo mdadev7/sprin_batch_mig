@@ -63,7 +63,9 @@ public class LineRangeFlatFileReader implements ItemStreamReader<PersonCsv> {
             if (!line.isBlank()) break;
             if (currentLine >= endLine) return null;
         }
-        return parse(line);
+        PersonCsv p = parse(line);
+        p.setLineNumber((long) currentLine);
+        return p;
     }
 
     private PersonCsv parse(String line) {
@@ -73,11 +75,16 @@ public class LineRangeFlatFileReader implements ItemStreamReader<PersonCsv> {
                     "Ligne invalide (colonnes=" + f.length + ") : " + line);
         }
         PersonCsv p = new PersonCsv();
-        p.setId(Long.parseLong(f[0].trim()));
+        try {
+            p.setId(Long.parseLong(f[0].trim()));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "ID non numérique : '" + f[0].trim() + "' — " + line);
+        }
         p.setNom(f[1].trim());
         p.setPrenom(f[2].trim());
-        p.setSalaire(f[3].trim()); //new BigDecimal(f[3].trim()));
-        p.setDateNaissance( f[4].trim() ) ; //LocalDate.parse(f[4].trim(), DATE_FMT));
+        p.setSalaire(f[3].trim());
+        p.setDateNaissance(f[4].trim());
         p.setVille(f[5].trim());
         return p;
     }
