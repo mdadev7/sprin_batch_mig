@@ -8,7 +8,8 @@ import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Lit la clé AES-256 (32 octets, Base64) depuis une variable
- * d'environnement dont le nom est fourni par CryptoConfig.
+ * d'environnement dont le nom est fourni par CryptoConfig, avec repli sur la
+ * propriété système du même nom (utile pour {@code -D...} et pour le batch).
  */
 public final class EnvKeyProvider implements KeyProvider {
 
@@ -18,7 +19,7 @@ public final class EnvKeyProvider implements KeyProvider {
         Objects.requireNonNull(config, "CryptoConfig requis");
 
         String variable = config.getKeyEnvironmentVariable();
-        String encodedKey = System.getenv(variable);
+        String encodedKey = readKey(variable);
 
         if (encodedKey == null || encodedKey.trim().isEmpty()) {
             throw new IllegalStateException("Variable de clé absente : " + variable);
@@ -38,6 +39,20 @@ public final class EnvKeyProvider implements KeyProvider {
             throw new IllegalStateException(
                 "Clé AES invalide (Base64/longueur) dans la variable " + variable, e);
         }
+    }
+
+    /**
+     * Résout la clé : variable d'environnement en priorité (production), puis
+     * propriété système. Ce second point permet de fournir la clé via
+     * {@code -DAPP_CRYPTO_KEY=...} ou via un fichier {@code .env} chargé par
+     * le batch (Dotenv) sans dépendre de l'environnement du processus.
+     */
+    private static String readKey(String variable) {
+        String value = System.getenv(variable);
+        if (value == null || value.trim().isEmpty()) {
+            value = System.getProperty(variable);
+        }
+        return value;
     }
 
     /** Constructeur de commodité : nom de variable passé directement. */

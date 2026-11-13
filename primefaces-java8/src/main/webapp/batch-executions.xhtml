@@ -14,9 +14,17 @@
 
         <p:growl id="growl" life="3000"/>
 
+        <!-- ================= Erreur de connexion ================= -->
+        <h:panelGroup rendered="#{not empty batchListBean.loadErrorMessage}">
+            <p:outputPanel styleClass="ui-message ui-message-error"
+                           style="display:block; padding:.75em; margin-bottom:1em">
+                <h:outputText value="#{batchListBean.loadErrorMessage}"/>
+            </p:outputPanel>
+        </h:panelGroup>
+
         <!-- ================= Filtres ================= -->
         <p:panel header="Filtres de recherche" style="margin-bottom: 1.5em">
-            <p:grid columns="4" style="margin-bottom: 1em">
+            <p:panelGrid columns="4" layout="grid" style="width: 100%">
                 <p:outputLabel for="jobExecutionId" value="ID exécution :"/>
                 <p:inputText id="jobExecutionId"
                              value="#{batchListBean.jobExecutionIdFilter}"
@@ -30,7 +38,7 @@
                     <f:selectItem itemLabel="Échec" itemValue="FAILED"/>
                     <f:selectItem itemLabel="Arrêté" itemValue="STOPPED"/>
                     <f:selectItem itemLabel="En cours" itemValue="STARTED"/>
-                    <p:ajax event="change" update="batchListForm"
+                    <p:ajax event="change" update=":batchListForm"
                             listener="#{batchListBean.filter}"/>
                 </p:selectOneMenu>
 
@@ -55,24 +63,24 @@
                 <p:inputText id="keyword"
                              value="#{batchListBean.keywordFilter}"
                              placeholder="Recherche dans le message d'erreur"/>
-            </p:grid>
+            </p:panelGrid>
 
             <p:toolbar style="margin-top: 1em">
                 <p:toolbarGroup>
                     <p:commandButton value="Rechercher"
                                      icon="pi pi-search"
-                                     update="batchListForm"
+                                     update=":batchListForm"
                                      action="#{batchListBean.filter}"/>
                     <p:commandButton value="Effacer"
                                      icon="pi pi-times"
-                                     update="batchListForm"
+                                     update=":batchListForm"
                                      action="#{batchListBean.clearFilters}"
                                      styleClass="ui-button-secondary"/>
                 </p:toolbarGroup>
                 <p:toolbarGroup align="right">
                     <p:commandButton value="Rafraîchir"
                                      icon="pi pi-refresh"
-                                     update="batchListForm"
+                                     update=":batchListForm"
                                      action="#{batchListBean.refresh}"/>
                 </p:toolbarGroup>
             </p:toolbar>
@@ -83,10 +91,11 @@
                  style="margin-bottom: 1.5em">
 
             <p:dataTable id="executionsTable"
-                         value="#{batchListBean.executions}"
+                         value="#{batchListBean.lazyModel}"
                          var="e"
                          rows="#{batchListBean.pageSize}"
                          first="#{batchListBean.first}"
+                         lazy="true"
                          paginator="true"
                          paginatorPosition="bottom"
                          paginatorTemplate="{FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
@@ -95,8 +104,7 @@
                          emptyMessage="Aucune exécution trouvée"
                          rowKey="#{e.id}"
                          selectionMode="single"
-                         selection="#{batchListBean.selected}"
-                         lazy="false">
+                         selection="#{batchListBean.selected}">
 
                 <p:ajax event="rowSelect"
                         listener="#{batchListBean.onRowSelect}"
@@ -111,13 +119,13 @@
                            severity="#{batchListBean.severityOf(e.status)}"/>
                 </p:column>
 
-                <p:column headerText="Début" width="160">
+                <p:column headerText="Début" sortBy="#{e.startTime}" width="160">
                     <h:outputText value="#{e.startTime}">
                         <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
                     </h:outputText>
                 </p:column>
 
-                <p:column headerText="Fin" width="160">
+                <p:column headerText="Fin" sortBy="#{e.endTime}" width="160">
                     <h:outputText value="#{e.endTime}">
                         <f:convertDateTime pattern="dd/MM/yyyy HH:mm:ss"/>
                     </h:outputText>
@@ -127,7 +135,7 @@
                     #{batchListBean.durationOf(e)}
                 </p:column>
 
-                <p:column headerText="Code de sortie" width="130">
+                <p:column headerText="Code de sortie" sortBy="#{e.exitCode}" width="130">
                     <p:tag value="#{e.exitCode}"
                            severity="#{e.exitCode == 'COMPLETED' ? 'success' : 'danger'}"/>
                 </p:column>
@@ -148,7 +156,8 @@
 
             <!-- Pagination info -->
             <p:outputPanel style="text-align: center; margin-top: 1em">
-                <h:outputText value="Affichage de #{batchListBean.startRecord} à #{batchListBean.endRecord} sur #{batchListBean.totalCount}" rendered="#{not empty batchListBean.executions}"/>
+                <h:outputText value="Affichage de #{batchListBean.startRecord} à #{batchListBean.endRecord} sur #{batchListBean.totalCount}"
+                              rendered="#{not empty batchListBean.executions}"/>
             </p:outputPanel>
 
             <p:commandButton id="detailButton"

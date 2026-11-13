@@ -19,6 +19,10 @@
     <properties>
         <java.version>17</java.version>
         <crypto-core.version>1.0.0</crypto-core.version>
+        <!-- Spring Boot 3.1.3 gère Lombok 1.18.28, incompatible avec les JDK 21
+             (NoSuchFieldError JCTree$JCImport.qualid). On force une version
+             compatible JDK 17 et JDK 21. -->
+        <lombok.version>1.18.34</lombok.version>
     </properties>
 
     <dependencies>

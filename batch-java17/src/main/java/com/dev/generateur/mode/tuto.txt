@@ -1,0 +1,88 @@
+Exemples d'utilisation
+Générer le batch Personne (source base externe, non partitionné)
+bash
+
+java -cp "target/classes:generator/target/classes" BatchGenerator \
+  com.example.batch.model.PersonneRow \
+  --package com.example.batch \
+  --basename Personne \
+  --table personne \
+  --source DATABASE \
+  --out ./generated/personne \
+  --partitioned false \
+  --key numSomme \
+  --dates dateNaissance,dateRecrutement,dateRachat,dateLimite
+
+Produit :
+text
+
+generated/personne/
+  PersonneRow.java
+  PersonneDbItemReader.java
+  PersonneProcessor.java
+  PersonneWriter.java
+  PersonneSkipListener.java
+  PersonneRepository.java
+  PersonneBatchConfiguration.java
+  personne_schema.sql
+
+Générer le batch Salaire (source fichier, partitionné)
+bash
+
+java -cp "target/classes:generator/target/classes" BatchGenerator \
+  com.example.batch.model.AttestationMensuelleRow \
+  --package com.example.batch \
+  --basename Attestation \
+  --table attestation \
+  --source FILE \
+  --out ./generated/attestation \
+  --delimiter ';' \
+  --partitioned true \
+  --key numSomme \
+  --dates dateCreation,dateLastUpdate
+
+Produit :
+text
+
+generated/attestation/
+  AttestationMensuelleRow.java
+  LineRangeAttestationReader.java
+  AttestationProcessor.java
+  AttestationWriter.java
+  AttestationSkipListener.java
+  AttestationBatchConfiguration.java
+  attestation_schema.sql
+
+Compilation et exécution
+bash
+
+# 1. Compiler le projet (les modèles doivent être compilés)
+mvn -q compile
+
+# 2. Compiler le générateur
+javac -d generator/target/classes generator/src/*.java
+
+# 3. Lancer
+java -cp "target/classes:generator/target/classes" BatchGenerator \
+  com.example.batch.model.PersonneRow --source DATABASE ...
+
+Ou via Maven exec :
+bash
+
+mvn -q exec:java \
+  -Dexec.mainClass=BatchGenerator \
+  -Dexec.args="com.example.batch.model.PersonneRow --source DATABASE --partitioned false --key numSomme" \
+  -Dexec.classpathScope=compile
+
+
+Limites et extensions possibles
+Limite	Extension
+Tous les champs mappés en VARCHAR(255)	Ajouter une map type Java → type SQL (int→INT, LocalDate→DATE, etc.)
+Pas de gestion des clés composites	Ajouter --pk "numSomme,mois,annee" et générer la clause SQL correspondante
+Templates en String dans le code	Externaliser dans src/main/resources/templates/*.ftl avec FreeMarker
+Pas de tests générés	Ajouter un template *BatchConfigurationTest.java (JUnit 5 + @SpringBatchTest)
+Pas de gestion du LineRangePartitioner généré	Il est supposé déjà présent (générique, réutilisable) — on peut aussi le générer une fois
+Pas de vérification des dépendances entre jobs	Le générateur ne connaît pas la relation attestation → personne ; à documenter manuellement
+
+Le générateur est idempotent : relancer écrase les fichiers existants. Il est stateless et ne dépend d'aucune configuration Spring. C'est un outil de scaffolding — vous pouvez ensuite ajuster manuellement chaque fichier généré (notamment le processor et le writer) pour coller à vos règles métier.
+

@@ -1,6 +1,7 @@
 package com.example.legacy.batch;
 
 import java.io.Serializable;
+import java.util.Locale;
 
 public class BatchCounters implements Serializable {
 
@@ -36,21 +37,32 @@ public class BatchCounters implements Serializable {
     public void setRollbacks(Long rollbacks) { this.rollbacks = rollbacks; }
 
     public Long getTotalSkips() {
-        Long r = readSkip != null ? readSkip : 0L;
-        Long p = processSkip != null ? processSkip : 0L;
-        Long w = writeSkip != null ? writeSkip : 0L;
-        return r + p + w;
+        return safe(readSkip) + safe(processSkip) + safe(writeSkip);
     }
 
+    /**
+     * Taux de succès = lignes non rejetées / lignes lues, borné à [0, 100].
+     * Le formatage utilise la locale française (virgule décimale) de façon
+     * cohérente, y compris pour le cas particulier 100 %.
+     */
     public String getSuccessRate() {
-        if (readCount == null || readCount == 0) {
-            return "100,00";
+        if (readCount == null || readCount <= 0) {
+            return String.format(Locale.FRANCE, "%.2f", 100.0d);
         }
-        Long total = readCount;
-        Long written = writeCount != null ? writeCount : 0L;
-        Long skipped = getTotalSkips();
-        Long success = total - skipped;
-        double rate = (double) success / (double) total * 100.0;
-        return String.format("%.2f", rate);
+
+        long total = readCount;
+        long successful = total - getTotalSkips();
+        if (successful < 0) {
+            successful = 0;
+        } else if (successful > total) {
+            successful = total;
+        }
+
+        double rate = (double) successful / (double) total * 100.0d;
+        return String.format(Locale.FRANCE, "%.2f", rate);
+    }
+
+    private static long safe(Long value) {
+        return value != null ? value : 0L;
     }
 }

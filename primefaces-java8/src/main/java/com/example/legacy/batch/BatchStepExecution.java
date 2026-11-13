@@ -32,8 +32,8 @@ public class BatchStepExecution implements Serializable {
     @Column(name = "STATUS")
     private String status;
 
-    @Column(name = "COMMIT_CODE")
-    private String commitCode;
+    @Column(name = "COMMIT_COUNT")
+    private Long commitCount;
 
     @Column(name = "EXIT_CODE")
     private String exitCode;
@@ -63,6 +63,10 @@ public class BatchStepExecution implements Serializable {
     private Long rollbackCount;
 
     @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "CREATE_TIME")
+    private Date createTime;
+
+    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "START_TIME")
     private Date startTime;
 
@@ -89,8 +93,8 @@ public class BatchStepExecution implements Serializable {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    public String getCommitCode() { return commitCode; }
-    public void setCommitCode(String commitCode) { this.commitCode = commitCode; }
+    public Long getCommitCount() { return commitCount; }
+    public void setCommitCount(Long commitCount) { this.commitCount = commitCount; }
 
     public String getExitCode() { return exitCode; }
     public void setExitCode(String exitCode) { this.exitCode = exitCode; }
@@ -118,6 +122,9 @@ public class BatchStepExecution implements Serializable {
 
     public Long getRollbackCount() { return rollbackCount; }
     public void setRollbackCount(Long rollbackCount) { this.rollbackCount = rollbackCount; }
+
+    public Date getCreateTime() { return createTime; }
+    public void setCreateTime(Date createTime) { this.createTime = createTime; }
 
     public Date getStartTime() { return startTime; }
     public void setStartTime(Date startTime) { this.startTime = startTime; }

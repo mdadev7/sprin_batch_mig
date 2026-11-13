@@ -6,53 +6,77 @@ import com.example.legacy.batch.BatchJobExecution;
 import com.example.legacy.batch.BatchStepExecution;
 import com.example.legacy.batch.PersonRejection;
 
-import javax.faces.bean.ManagedBean;
-import javax.faces.bean.ManagedProperty;
-import javax.faces.bean.ViewScoped;
+import javax.annotation.PostConstruct;
 import javax.faces.context.FacesContext;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-@ManagedBean(name = "batchDetailBean")
-@ViewScoped
+/**
+ * Backing bean du détail d'une exécution de batch.
+ * <p>
+ * Bean déclaré dans {@code faces-config.xml} (scope view) : pas d'annotations
+ * {@code @ManagedBean}/{@code @ViewScoped} pour éviter un double enregistrement.
+ */
 public class BatchDetailBean implements Serializable {
 
     private static final long serialVersionUID = 1L;
-    private static final SimpleDateFormat DATE_FMT =
-            new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
-    @ManagedProperty(value = "#{batchConsultationDao}")
+    private static final String DATE_PATTERN = "dd/MM/yyyy HH:mm:ss";
+
     private BatchConsultationDao dao;
 
     private Long id;
     private BatchJobExecution execution;
-    private List<BatchStepExecution> steps;
-    private BatchCounters counters;
-    private List<PersonRejection> rejections;
+    private List<BatchStepExecution> steps = Collections.emptyList();
+    private BatchCounters counters = new BatchCounters();
+    private List<PersonRejection> rejections = Collections.emptyList();
 
-    @SuppressWarnings("unchecked")
-    @javax.annotation.PostConstruct
+    /** Renseigné si la base est indisponible (affiché par la vue). */
+    private String loadErrorMessage;
+
+    @PostConstruct
     public void init() {
-        Map<String, String> params =
-            FacesContext.getCurrentInstance()
+        Map<String, String> params = FacesContext.getCurrentInstance()
                 .getExternalContext()
                 .getRequestParameterMap();
-        String p = params.get("id");
-        if (p != null && !p.isEmpty()) {
-            try {
-                id = Long.valueOf(p);
-                execution = dao.findExecution(id);
-                if (execution != null) {
-                    steps = dao.findSteps(id);
-                    counters = dao.aggregate(id);
-                    rejections = dao.findRejections(id);
+        String rawId = params.get("id");
+        if (rawId == null || rawId.trim().isEmpty() || dao == null) {
+            return;
+        }
+
+        try {
+            id = Long.valueOf(rawId.trim());
+            execution = dao.findExecution(id);
+            if (execution != null) {
+                List<BatchStepExecution> loadedSteps = dao.findSteps(id);
+                if (loadedSteps != null) {
+                    steps = loadedSteps;
                 }
-            } catch (NumberFormatException ignored) {
-                // id invalide -> page vide
+
+                BatchCounters loadedCounters = dao.aggregate(id);
+                if (loadedCounters != null) {
+                    counters = loadedCounters;
+                }
+
+                List<PersonRejection> loadedRejections = dao.findRejections(id);
+                if (loadedRejections != null) {
+                    rejections = loadedRejections;
+                }
             }
+        } catch (NumberFormatException ignored) {
+            // id invalide -> page vide (message affiché par la vue)
+        } catch (RuntimeException e) {
+            // Base momentanément indisponible : on affiche un message plutôt
+            // qu'une page d'erreur JSF, et l'utilisateur peut revenir à la liste.
+            execution = null;
+            steps = Collections.emptyList();
+            counters = new BatchCounters();
+            rejections = Collections.emptyList();
+            loadErrorMessage = "Consultation de la base impossible : " + e.getMessage();
         }
     }
 
@@ -72,14 +96,14 @@ public class BatchDetailBean implements Serializable {
         if (execution == null || execution.getStartTime() == null) {
             return "—";
         }
-        return DATE_FMT.format(execution.getStartTime());
+        return format(execution.getStartTime());
     }
 
     public String getEndTimeFormatted() {
         if (execution == null || execution.getEndTime() == null) {
             return "—";
         }
-        return DATE_FMT.format(execution.getEndTime());
+        return format(execution.getEndTime());
     }
 
     public String severityOf(String status) {
@@ -102,23 +126,26 @@ public class BatchDetailBean implements Serializable {
         return rejections != null && !rejections.isEmpty();
     }
 
+    /**
+     * Un {@link SimpleDateFormat} n'est pas thread-safe : on en crée un par appel.
+     */
+    private static String format(Date date) {
+        return new SimpleDateFormat(DATE_PATTERN).format(date);
+    }
+
     // ---------- Getters / Setters ----------
 
     public void setDao(BatchConsultationDao dao) { this.dao = dao; }
 
     public Long getId() { return id; }
 
+    public String getLoadErrorMessage() { return loadErrorMessage; }
+
     public BatchJobExecution getExecution() { return execution; }
 
-    public List<BatchStepExecution> getSteps() {
-        return steps != null ? steps : java.util.Collections.emptyList();
-    }
+    public List<BatchStepExecution> getSteps() { return steps; }
 
-    public BatchCounters getCounters() {
-        return counters != null ? counters : new BatchCounters();
-    }
+    public BatchCounters getCounters() { return counters; }
 
-    public List<PersonRejection> getRejections() {
-        return rejections != null ? rejections : java.util.Collections.emptyList();
-    }
+    public List<PersonRejection> getRejections() { return rejections; }
 }

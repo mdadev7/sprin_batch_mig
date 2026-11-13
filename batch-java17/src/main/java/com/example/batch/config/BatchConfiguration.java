@@ -2,7 +2,6 @@ package com.example.batch.config;
 
 import com.example.batch.listener.PersonSkipListener;
 import com.example.batch.model.PersonCsv;
-import org.springframework.batch.core.SkipListener;
 import com.example.batch.model.PersonRow;
 import com.example.batch.partitioner.LineRangePartitioner;
 import com.example.batch.processor.PersonRowProcessor;
@@ -22,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -69,6 +69,10 @@ public class BatchConfiguration {
         Map<Class<? extends Throwable>, Boolean> skippable = new HashMap<>();
         skippable.put(IllegalArgumentException.class, true);
         skippable.put(FlatFileParseException.class, true);
+        // RG3 / RG10 : un id déjà présent (dans le fichier ou en base) viole la
+        // contrainte de clé primaire. La ligne est rejetée et tracée, sans
+        // interrompre le job.
+        skippable.put(DuplicateKeyException.class, true);
 
         SkipPolicy skipPolicy =
                 new LimitCheckingItemSkipPolicy(skipLimit, skippable);
@@ -80,7 +84,7 @@ public class BatchConfiguration {
                 .writer(writer)
                 .faultTolerant()
                 .skipPolicy(skipPolicy)
-                .listener((SkipListener<PersonCsv, Object>) skipListener)
+                .listener(skipListener)
                 .build();
     }
 

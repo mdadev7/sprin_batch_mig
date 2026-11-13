@@ -103,6 +103,7 @@ public class PersonRowProcessor
             row.setSalaireEncrypted(encrypted);
             row.setDateNaissance(Date.valueOf(date));
             row.setVille(csv.getVille());
+            row.setLineNumber(csv.getLineNumber());
 
             return row;
 

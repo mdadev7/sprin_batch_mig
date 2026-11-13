@@ -41,6 +41,8 @@ public class LineRangePartitioner implements Partitioner {
             ExecutionContext ec = new ExecutionContext();
             ec.putInt("startLine", start);
             ec.putInt("endLine", end);
+            // Utilisé par PersonSkipListener pour tracer la partition d'origine.
+            ec.putString("partitionId", "partition-" + i);
             result.put("partition-" + i, ec);
         }
         return result;
@@ -58,7 +60,10 @@ public class LineRangePartitioner implements Partitioner {
                 return n;
             }
         } catch (Exception e) {
-            throw new IllegalStateException("Impossible de compter les lignes : " + location, e);
+            throw new IllegalStateException(
+                    "Impossible de lire le fichier d'entrée '" + location
+                            + "' (propriété batch.input-file / BATCH_INPUT_FILE) : "
+                            + e.getMessage(), e);
         }
     }
 }

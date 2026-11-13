@@ -1,51 +1,74 @@
 spring:
   application:
     name: batch-migration
+  main:
+    # Application de traitement : aucun serveur web à démarrer.
+    web-application-type: none
   config:
-    import: "optional:classpath:batch-config.properties"
+    # batch-config.properties (classpath, développement) puis .env local s'il existe.
+    # Les deux sources sont optionnelles : en production, tout vient des variables d'OS.
+    import:
+      - "optional:classpath:batch-config.properties"
+      - "optional:file:./.env[.properties]"
   datasource:
-    url: ${DB_URL:jdbc:mariadb://localhost:3307/dotations_db?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true}
-    username: ${DB_USERNAME:devuser}
-    password: ${DB_PASSWORD:dev159357}
-    driver-class-name: org.mariadb.jdbc.Driver
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/dotations_db?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: ${DB_DRIVER:org.mariadb.jdbc.Driver}
     hikari:
       maximum-pool-size: 12
       minimum-idle: 2
   batch:
     jdbc:
+      # Le schéma BATCH_* est géré par Flyway (V2), pas par Spring Batch.
       initialize-schema: never
     job:
-      enabled: true
+      # Lancement explicite par JobRunner (et non par Spring Boot au démarrage),
+      # pour éviter une double exécution du job.
+      enabled: false
   jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        show_sql: true
-        format_sql: true
-        hbm2ddl:
-          auto: none
+        show_sql: false
+        format_sql: false
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # Base existante : V1 a été baselinée et V3 appliquée avant V2.
+    baseline-on-migrate: true
+    out-of-order: true
+    # V2__batch_schema.sql a été réécrit après son application sur la base de
+    # développement : sans cette option, Flyway refuse de démarrer (checksum
+    # mismatch). Une fois la base réparée (`flyway repair`), repasser à true.
+    validate-on-migrate: false
 
 # Configuration cryptographique
 crypto:
   transformation: ${CRYPTO_TRANSFORMATION:AES/GCM/NoPadding}
-  key-environment-variable: ${CRYPTO_KEY_ENV_NAME:APP_CRYPTO_KEY}
+  key-environment-variable: ${CRYPTO_KEY_ENVIRONMENT_VARIABLE:APP_CRYPTO_KEY}
   iv-length: ${CRYPTO_IV_LENGTH:12}
   tag-length: ${CRYPTO_TAG_LENGTH:128}
   format-version: ${CRYPTO_FORMAT_VERSION:v1}
 
 # Configuration migration
 batch:
+  # Permet de démarrer l'application sans lancer le job (vérification de configuration).
+  run-on-startup: ${BATCH_RUN_ON_STARTUP:true}
   input-file: ${BATCH_INPUT_FILE:classpath:data/person.csv}
   chunk-size: ${BATCH_CHUNK_SIZE:500}
   grid-size: ${BATCH_GRID_SIZE:8}
   skip-limit: ${BATCH_SKIP_LIMIT:100}
-  throttle-limit: 8
-  retry-limit: 3
+  throttle-limit: ${BATCH_GRID_SIZE:8}
+  retry-limit: ${BATCH_RETRY_LIMIT:3}
 
 logging:
+  charset:
+    console: UTF-8
   level:
     root: INFO
     com.example.batch: INFO
+    org.mariadb.jdbc.message.server.ErrorPacket: ERROR

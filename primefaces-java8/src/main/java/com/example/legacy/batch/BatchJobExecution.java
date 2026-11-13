@@ -26,12 +26,6 @@ public class BatchJobExecution implements Serializable {
     @Column(name = "JOB_INSTANCE_ID")
     private Long jobInstanceId;
 
-    @Column(name = "JOB_NAME")
-    private String jobName;
-
-    @Column(name = "JOB_KEY")
-    private String jobKey;
-
     @Column(name = "STATUS")
     private String status;
 
@@ -57,9 +51,6 @@ public class BatchJobExecution implements Serializable {
     @Column(name = "LAST_UPDATED")
     private Date lastUpdated;
 
-    @Column(name = "JOB_CONFIGURATION_LOCATION")
-    private String jobConfigurationLocation;
-
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -68,12 +59,6 @@ public class BatchJobExecution implements Serializable {
 
     public Long getJobInstanceId() { return jobInstanceId; }
     public void setJobInstanceId(Long jobInstanceId) { this.jobInstanceId = jobInstanceId; }
-
-    public String getJobName() { return jobName; }
-    public void setJobName(String jobName) { this.jobName = jobName; }
-
-    public String getJobKey() { return jobKey; }
-    public void setJobKey(String jobKey) { this.jobKey = jobKey; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
@@ -95,11 +80,6 @@ public class BatchJobExecution implements Serializable {
 
     public Date getLastUpdated() { return lastUpdated; }
     public void setLastUpdated(Date lastUpdated) { this.lastUpdated = lastUpdated; }
-
-    public String getJobConfigurationLocation() { return jobConfigurationLocation; }
-    public void setJobConfigurationLocation(String jobConfigurationLocation) {
-        this.jobConfigurationLocation = jobConfigurationLocation;
-    }
 
     public Long getDurationSeconds() {
         if (startTime == null || endTime == null) {

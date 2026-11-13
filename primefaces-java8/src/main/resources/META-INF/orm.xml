@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="UTF-8"?>
 
 <entity-mappings
@@ -12,8 +11,7 @@
 
             <basic name="salaire">
                 <column name="salaire_encrypted"/>
-                <convert converter=
-                    "com.example.legacy.converter.FloatCryptedConverter"/>
+                <convert converter="com.example.legacy.converter.FloatCryptedConverter"/>
             </basic>
 
         </attributes>

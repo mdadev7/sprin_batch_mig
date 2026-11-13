@@ -23,16 +23,26 @@
                         disabled="true"/>
         </p:breadCrumb>
 
+        <!-- ================= Erreur de connexion ================= -->
+        <h:panelGroup rendered="#{not empty batchDetailBean.loadErrorMessage}">
+            <p:outputPanel styleClass="ui-message ui-message-error"
+                           style="display:block; padding:.75em; margin-bottom:1em">
+                <h:outputText value="#{batchDetailBean.loadErrorMessage}"/>
+            </p:outputPanel>
+        </h:panelGroup>
+
         <!-- ================= Aucun résultat ================= -->
-        <h:panelGroup rendered="#{empty batchDetailBean.execution}">
-            <p:message severity="warn"
-                       text="Exécution introuvable pour cet identifiant."/>
+        <h:panelGroup rendered="#{empty batchDetailBean.execution and empty batchDetailBean.loadErrorMessage}">
+            <p:outputPanel styleClass="ui-message ui-message-warn"
+                           style="display:block; padding:.75em; margin-bottom:1em">
+                <h:outputText value="Exécution introuvable pour cet identifiant."/>
+            </p:outputPanel>
         </h:panelGroup>
 
         <!-- ================= Détail ================= -->
         <h:panelGroup rendered="#{not empty batchDetailBean.execution}">
 
-            <!-- ---------- En-tête ---------- -->
+            <!-- ================= En-tête ================= -->
             <p:panel header="Informations générales" style="margin-bottom: 1em">
                 <p:panelGrid columns="4"
                              layout="grid"
@@ -59,8 +69,8 @@
                     <p:tag value="#{batchDetailBean.execution.exitCode}"
                            severity="#{batchDetailBean.execution.exitCode == 'COMPLETED' ? 'success' : 'danger'}"/>
 
-                    <h:outputText value="Job :"/>
-                    <h:outputText value="#{batchDetailBean.execution.jobName}"/>
+                    <h:outputText value="Instance du job :"/>
+                    <h:outputText value="#{batchDetailBean.execution.jobInstanceId}"/>
 
                     <h:outputText value="Message :"/>
                     <h:outputText value="#{batchDetailBean.truncate(batchDetailBean.execution.exitMessage, 200)}"
@@ -69,62 +79,53 @@
                 </p:panelGrid>
             </p:panel>
 
-            <!-- ---------- Compteurs agrégés ---------- -->
+            <!-- ================= Compteurs agrégés ================= -->
             <p:panel header="Compteurs agrégés" style="margin-bottom: 1em">
                 <p:panelGrid columns="4"
                              layout="grid"
                              style="width: 100%">
 
-                    <p:card>
-                        <f:facet name="title">Lignes lues</f:facet>
+                    <p:card title="Lignes lues">
                         <h2 style="margin:0">#{batchDetailBean.counters.readCount}</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Lignes écrites</f:facet>
+                    <p:card title="Lignes écrites">
                         <h2 style="margin:0">#{batchDetailBean.counters.writeCount}</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Taux de succès</f:facet>
+                    <p:card title="Taux de succès">
                         <h2 style="margin:0">#{batchDetailBean.counters.successRate}%</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Total rejets</f:facet>
+                    <p:card title="Total rejets">
                         <h2 style="margin:0; color:#c0392b">
                             #{batchDetailBean.counters.totalSkips}
                         </h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Rejets lecture</f:facet>
+                    <p:card title="Rejets lecture">
                         <h2 style="margin:0">#{batchDetailBean.counters.readSkip}</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Rejets traitement</f:facet>
+                    <p:card title="Rejets traitement">
                         <h2 style="margin:0">#{batchDetailBean.counters.processSkip}</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Rejets écriture</f:facet>
+                    <p:card title="Rejets écriture">
                         <h2 style="margin:0">#{batchDetailBean.counters.writeSkip}</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Commits</f:facet>
+                    <p:card title="Commits">
                         <h2 style="margin:0">#{batchDetailBean.counters.commits}</h2>
                     </p:card>
 
-                    <p:card>
-                        <f:facet name="title">Rollbacks</f:facet>
+                    <p:card title="Rollbacks">
                         <h2 style="margin:0">#{batchDetailBean.counters.rollbacks}</h2>
                     </p:card>
                 </p:panelGrid>
             </p:panel>
 
-            <!-- ---------- Détail par étape ---------- -->
+            <!-- ================= Détail par étape ================= -->
             <p:panel header="Détail par étape (partitions)" style="margin-bottom: 1em">
                 <p:dataTable value="#{batchDetailBean.steps}"
                              var="s"
@@ -196,13 +197,15 @@
                 </p:dataTable>
             </p:panel>
 
-            <!-- ---------- Rejets détaillés ---------- -->
-            <h:panelGroup rendered="#{batchDetailBean.hasRejections()}">
+            <!-- ================= Rejets détaillés ================= -->
+            <h:panelGroup rendered="#{not empty batchDetailBean.rejections}">
                 <p:panel header="Lignes rejetées (détail)" style="margin-bottom: 1em">
                     <p:dataTable value="#{batchDetailBean.rejections}"
                                  var="r"
+                                 rowKey="#{r.id}"
                                  rows="20"
                                  paginator="true"
+                                 paginatorTemplate="{FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink}"
                                  emptyMessage="Aucun rejet">
 
                         <p:column headerText="Ligne CSV" width="100">
@@ -230,15 +233,11 @@
                 </p:panel>
             </h:panelGroup>
 
-            <h:panelGroup rendered="#{not batchDetailBean.hasRejections()}">
-                <p:messages severity="info"
-                            closable="false"
-                            showDetail="false"
-                            rendered="true"
-                            style="display:block; margin-bottom:1em">
-                    <p:message severity="info"
-                               text="Aucun rejet enregistré pour cette exécution."/>
-                </p:messages>
+            <h:panelGroup rendered="#{empty batchDetailBean.rejections}">
+                <p:outputPanel styleClass="ui-message ui-message-info"
+                               style="display:block; padding:.75em; margin-bottom:1em">
+                    <h:outputText value="Aucun rejet enregistré pour cette exécution."/>
+                </p:outputPanel>
             </h:panelGroup>
 
             <p:commandButton value="Retour à la liste"

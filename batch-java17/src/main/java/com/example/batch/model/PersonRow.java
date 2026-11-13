@@ -10,6 +10,8 @@ public class PersonRow {
     private String salaireEncrypted;
     private Date dateNaissance;
     private String ville;
+    /** Numéro de la ligne d'origine dans le CSV (traçabilité des rejets). */
+    private Long lineNumber;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -40,4 +42,7 @@ public class PersonRow {
 
     public String getVille() { return ville; }
     public void setVille(String ville) { this.ville = ville; }
+
+    public Long getLineNumber() { return lineNumber; }
+    public void setLineNumber(Long lineNumber) { this.lineNumber = lineNumber; }
 }
