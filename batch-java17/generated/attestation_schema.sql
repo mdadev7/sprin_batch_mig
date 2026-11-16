@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS attestation_rejection (
     id                BIGINT AUTO_INCREMENT PRIMARY KEY,
     job_execution_id  BIGINT       NOT NULL,
     step_name         VARCHAR(255) NOT NULL,
-    raw_content       TEXT,
+    id                VARCHAR(64),
     reason            TEXT,
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

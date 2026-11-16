@@ -1,4 +1,4 @@
-package com.dev.reader;
+package com.dev.generateur.reader;
 
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
@@ -6,9 +6,10 @@ import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.core.io.FileSystemResource;
 
-import com.dev.model.AttestationRow;
+import com.dev.generateur.model.AttestationRow;
 
 public class LineRangeAttestationReader extends FlatFileItemReader<AttestationRow> {
+
     public LineRangeAttestationReader(String inputFile, int startLine, int endLine) {
         setResource(new FileSystemResource(inputFile));
         setLinesToSkip(startLine - 1);

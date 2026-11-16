@@ -1,6 +1,7 @@
 package com.dev.generateur.mode;
 
 public enum SourceType {
-    FILE,       // source = fichier CSV (reader partitionné)
-    DATABASE    // source = base externe (JdbcPagingItemReader)
+    FILE,               // CSV → INSERT simple
+    DATABASE,           // base externe → INSERT simple
+    FILE_WITH_UPSERT    // CSV → upsert (personne)
 }

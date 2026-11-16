@@ -1,6 +1,6 @@
-package com.dev.listener;
+package com.dev.generateur.listener;
 
-import com.dev.model.AttestationRow;
+import com.dev.generateur.model.AttestationRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.ExitStatus;
@@ -25,7 +25,8 @@ public class AttestationSkipListener
                                   PlatformTransactionManager txManager) {
         this.jdbcTemplate = jdbcTemplate;
         this.requiresNew = new TransactionTemplate(txManager);
-        this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.requiresNew.setPropagationBehavior(
+                TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override public void beforeStep(StepExecution s) {
@@ -35,30 +36,31 @@ public class AttestationSkipListener
     @Override public ExitStatus afterStep(StepExecution s) { return null; }
 
     @Override public void onSkipInRead(Throwable t) {
-        String raw = (t instanceof org.springframework.batch.item.file.FlatFileParseException f)
-                ? f.getInput() : null;
-        insert(raw, t.getMessage());
+        insert(null, t.getMessage());
     }
     @Override public void onSkipInProcess(AttestationRow item, Throwable t) {
-        insert(item != null ? item.toString() : null, t.getMessage());
+        insert(item != null ? item.getId() : null, t.getMessage());
     }
     @Override public void onSkipInWrite(AttestationRow item, Throwable t) {
-        insert(item != null ? item.toString() : null, t.getMessage());
+        insert(item != null ? item.getId() : null, t.getMessage());
     }
 
-    private void insert(String rawContent, String reason) {
+    private void insert(String key, String reason) {
         if (jobExecutionId == null || stepName == null) {
             log.warn("Rejet non persisté : {}", reason); return;
         }
         try {
             requiresNew.executeWithoutResult(st ->
                 jdbcTemplate.update(
-                    "INSERT INTO attestation_rejection (job_execution_id, step_name, raw_content, reason) " +
+                    "INSERT INTO attestation_rejection " +
+                    "(job_execution_id, step_name, id, reason) " +
                     "VALUES (?, ?, ?, ?)",
-                    jobExecutionId, stepName, rawContent, reason));
-            log.info("Rejet persisté : step={} raison={}", stepName, reason);
+                    jobExecutionId, stepName, key, reason));
+            log.info("Rejet persisté : step={} key={} raison={}",
+                    stepName, key, reason);
         } catch (Exception e) {
-            log.error("Impossible d'enregistrer le rejet [{}] : {}", reason, e.getMessage(), e);
+            log.error("Impossible d'enregistrer le rejet [{}] : {}",
+                    reason, e.getMessage(), e);
         }
     }
 }

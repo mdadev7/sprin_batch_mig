@@ -18,6 +18,13 @@ spring:
     hikari:
       maximum-pool-size: 12
       minimum-idle: 2
+  # Base métier (primaire) — JPA + batch cible
+  # Base externe (source référentiel PERSONNEL)
+  batch-personne-datasource:
+    url: jdbc:oracle:thin:@//hr-db:1521/HR
+    username: hr
+    password: hr
+    driver-class-name: oracle.jdbc.OracleDriver	
   batch:
     jdbc:
       # Le schéma BATCH_* est géré par Flyway (V2), pas par Spring Batch.

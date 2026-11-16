@@ -25,6 +25,14 @@ import java.util.List;
  *     --dates dateNaissance,dateRecrutement
  */
 	
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
 public class BatchGenerator {
 
     public static void main(String[] args) throws Exception {
@@ -32,6 +40,7 @@ public class BatchGenerator {
             System.err.println("Usage: BatchGenerator <fqcn> [options]");
             System.exit(1);
         }
+
         String fqcn = args[0];
         String basePackage = "com.example.batch";
         String baseName = null;
@@ -42,18 +51,26 @@ public class BatchGenerator {
         boolean partitioned = true;
         String keyField = "id";
         String[] dateFields = new String[0];
+        String primaryDs = "primaryDataSource";
+        String sourceDs = "personneSourceDataSource";
+        String txManager = "transactionManager";
+        String jdbcTpl = "jdbcTemplate";
 
         for (int i = 1; i < args.length; i++) {
             switch (args[i]) {
-                case "--package"     -> basePackage = args[++i];
-                case "--basename"    -> baseName = args[++i];
-                case "--table"       -> tableName = args[++i];
-                case "--source"      -> sourceType = SourceType.valueOf(args[++i].toUpperCase());
-                case "--out"         -> out = Path.of(args[++i]);
-                case "--delimiter"   -> delimiter = args[++i].charAt(0);
-                case "--partitioned" -> partitioned = Boolean.parseBoolean(args[++i]);
-                case "--key"         -> keyField = args[++i];
-                case "--dates"       -> dateFields = args[++i].split(",");
+                case "--package"      -> basePackage = args[++i];
+                case "--basename"     -> baseName = args[++i];
+                case "--table"        -> tableName = args[++i];
+                case "--source"       -> sourceType = SourceType.valueOf(args[++i].toUpperCase());
+                case "--out"          -> out = Path.of(args[++i]);
+                case "--delimiter"    -> delimiter = args[++i].charAt(0);
+                case "--partitioned"  -> partitioned = Boolean.parseBoolean(args[++i]);
+                case "--key"          -> keyField = args[++i];
+                case "--dates"        -> dateFields = args[++i].split(",");
+                case "--primary-ds"   -> primaryDs = args[++i];
+                case "--source-ds"    -> sourceDs = args[++i];
+                case "--tx"           -> txManager = args[++i];
+                case "--jdbc"         -> jdbcTpl = args[++i];
                 default -> throw new IllegalArgumentException("Option inconnue : " + args[i]);
             }
         }
@@ -65,61 +82,50 @@ public class BatchGenerator {
         List<Field> fields = new ArrayList<>();
         for (Field f : model.getDeclaredFields()) {
             if (Modifier.isStatic(f.getModifiers())) continue;
-            if (f.getName().equals("resolvedPersonneId")) continue; // champ transient
+            if (f.getName().equals("resolvedPersonneId")) continue;
             fields.add(f);
         }
 
         GeneratorContext ctx = new GeneratorContext(
                 model, basePackage, baseName, tableName, sourceType,
-                out, delimiter, partitioned, fields, keyField, dateFields);
+                out, delimiter, partitioned, fields, keyField, dateFields,
+                primaryDs, sourceDs, txManager, jdbcTpl);
 
         Files.createDirectories(out);
 
-        // 1. Modèle d'entrée (pour source BASE ou FILE, on garde le modèle tel quel)
         write(out.resolve(model.getSimpleName() + ".java"), modelTemplate(ctx));
 
-        // 2. Reader (dépend du type source)
-        if (sourceType == SourceType.FILE) {
+        if (ctx.isFile()) {
             write(out.resolve("LineRange" + baseName + "Reader.java"), fileReaderTemplate(ctx));
         } else {
             write(out.resolve(baseName + "DbItemReader.java"), dbReaderTemplate(ctx));
         }
 
-        // 3. Processor
         write(out.resolve(baseName + "Processor.java"), processorTemplate(ctx));
-
-        // 4. Writer
         write(out.resolve(baseName + "Writer.java"), writerTemplate(ctx));
-
-        // 5. Skip listener
         write(out.resolve(baseName + "SkipListener.java"), skipListenerTemplate(ctx));
 
-        // 6. Repository (si source BASE ou writer avec upsert)
-        if (sourceType == SourceType.DATABASE) {
+        if (ctx.isUpsert()) {
             write(out.resolve(baseName + "Repository.java"), repositoryTemplate(ctx));
+            write(out.resolve(baseName + "UpsertWriter.java"), upsertWriterTemplate(ctx));
         }
 
-        // 7. Configuration
         write(out.resolve(baseName + "BatchConfiguration.java"), configTemplate(ctx));
-
-        // 8. SQL
         write(out.resolve(tableName + "_schema.sql"), sqlTemplate(ctx));
 
         System.out.println("✔ Génération terminée dans " + out.toAbsolutePath());
     }
-
-    // ---------- Écriture ----------
 
     private static void write(Path p, String content) throws IOException {
         Files.writeString(p, content);
         System.out.println("  → " + p.getFileName());
     }
 
-    // ---------- Templates ----------
+    // =========================================================
+    // Templates
+    // =========================================================
 
     private static String modelTemplate(GeneratorContext c) {
-        // Le modèle est déjà fourni par l'utilisateur — on ne le régénère pas.
-        // Mais on peut générer une version "propre" pour référence.
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(c.basePackage).append(".model;\n\n");
         sb.append("import lombok.Getter;\nimport lombok.Setter;\n\n");
@@ -189,6 +195,7 @@ public class BatchGenerator {
                     "                r.set%s(rs.getString(\"%s\"));",
                     capitalize(f.getName()), camelToSnake(f.getName()).toUpperCase()))
                 .reduce((a, b) -> a + "\n" + b).orElse("");
+        String sortKey = camelToSnake(c.keyField).toUpperCase();
         return """
             package %s.reader;
 
@@ -234,14 +241,10 @@ public class BatchGenerator {
                 }
             }
             """.formatted(c.basePackage, c.basePackage, c.model.getSimpleName(),
-                          c.baseName, c.model.getSimpleName(),
-                          c.baseName,
-                          selectCols,
-                          camelToSnake(c.keyField).toUpperCase(),
-                          camelToSnake(c.keyField).toUpperCase(),
+                          c.baseName, c.model.getSimpleName(), c.baseName,
+                          selectCols, sortKey, sortKey,
                           c.model.getSimpleName(), c.model.getSimpleName(),
-                          rowMapperSetters,
-                          c.baseName, c.baseName);
+                          rowMapperSetters, c.baseName, c.baseName);
     }
 
     private static String processorTemplate(GeneratorContext c) {
@@ -267,7 +270,6 @@ public class BatchGenerator {
                     if (item.get%s() == null || item.get%s().isBlank()) {
                         throw new IllegalArgumentException("%s manquant");
                     }
-                    // TODO : validations métier supplémentaires
             %s
                     return item;
                 }
@@ -327,6 +329,41 @@ public class BatchGenerator {
                           c.tableName, cols, vals,
                           c.baseName, c.model.getSimpleName(), c.model.getSimpleName(),
                           setters.toString());
+    }
+
+    private static String upsertWriterTemplate(GeneratorContext c) {
+        return """
+            package %s.writer;
+
+            import org.springframework.batch.item.Chunk;
+            import org.springframework.batch.item.ItemWriter;
+            import org.springframework.stereotype.Component;
+
+            import %s.model.%s;
+            import %s.repository.%sRepository;
+
+            @Component
+            public class %sUpsertWriter implements ItemWriter<%s> {
+
+                private final %sRepository repository;
+
+                public %sUpsertWriter(%sRepository repository) {
+                    this.repository = repository;
+                }
+
+                @Override
+                public void write(Chunk<? extends %s> chunk) {
+                    for (%s r : chunk.getItems()) {
+                        repository.upsert(r.get%s());
+                    }
+                }
+            }
+            """.formatted(c.basePackage, c.basePackage, c.model.getSimpleName(),
+                          c.basePackage, c.baseName,
+                          c.baseName, c.model.getSimpleName(),
+                          c.baseName, c.baseName, c.baseName,
+                          c.model.getSimpleName(), c.model.getSimpleName(),
+                          capitalize(c.keyField));
     }
 
     private static String skipListenerTemplate(GeneratorContext c) {
@@ -399,8 +436,7 @@ public class BatchGenerator {
             }
             """.formatted(c.basePackage, c.basePackage, c.model.getSimpleName(),
                           c.baseName, c.model.getSimpleName(), c.model.getSimpleName(),
-                          c.baseName,
-                          c.baseName,
+                          c.baseName, c.baseName,
                           c.model.getSimpleName(), capitalize(c.keyField),
                           c.model.getSimpleName(), capitalize(c.keyField),
                           c.tableName, camelToSnake(c.keyField));
@@ -460,9 +496,9 @@ public class BatchGenerator {
     }
 
     private static String configTemplate(GeneratorContext c) {
-        boolean file = c.sourceType == SourceType.FILE;
         String var = Character.toLowerCase(c.baseName.charAt(0)) + c.baseName.substring(1);
-        String readerBean = file
+
+        String readerBean = c.isFile()
                 ? """
                   @Bean @StepScope
                   public LineRange%sReader %sReader(
@@ -476,12 +512,12 @@ public class BatchGenerator {
                 : """
                   @Bean @StepScope
                   public %sDbItemReader %sReader(
-                          @Qualifier("personneSourceDataSource") DataSource sourceDs) {
+                          @Qualifier("%s") DataSource sourceDs) {
                       return new %sDbItemReader(sourceDs, sourceSchema, sourceTable, pageSize);
                   }
-                  """.formatted(c.baseName, var, c.baseName);
+                  """.formatted(c.baseName, var, c.sourceDataSourceBean, c.baseName);
 
-        String partitionerBean = file && c.partitioned
+        String partitionerBean = c.isFile() && c.partitioned
                 ? """
                   @Bean
                   public Step %sMasterStep(JobRepository jobRepository,
@@ -495,13 +531,18 @@ public class BatchGenerator {
                   """.formatted(var, var, var, var, var)
                 : "";
 
-        String jobStart = file && c.partitioned
+        String jobStart = c.isFile() && c.partitioned
                 ? "@Qualifier(\"" + var + "MasterStep\") Step masterStep"
                 : "@Qualifier(\"" + var + "WorkerStep\") Step workerStep";
 
-        String jobBean = file && c.partitioned
+        String jobBeanStart = c.isFile() && c.partitioned
                 ? ".start(masterStep)"
                 : ".start(workerStep)";
+
+        String writerClass = c.isUpsert() ? c.baseName + "UpsertWriter" : c.baseName + "Writer";
+        String readerImport = c.isFile()
+                ? "import " + c.basePackage + ".reader.LineRange" + c.baseName + "Reader;"
+                : "import " + c.basePackage + ".reader." + c.baseName + "DbItemReader;";
 
         return """
             package %s.config;
@@ -540,7 +581,7 @@ public class BatchGenerator {
             import %s.partitioner.LineRangePartitioner;
             import %s.processor.%sProcessor;
             %s
-            import %s.writer.%sWriter;
+            import %s.writer.%s;
 
             @Configuration
             @Import(ScopeConfiguration.class)
@@ -563,8 +604,8 @@ public class BatchGenerator {
 
                 @Bean @StepScope @Scope(value = "step", proxyMode = ScopedProxyMode.TARGET_CLASS)
                 public %sSkipListener %sSkipListener(
-                        @Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate,
-                        @Qualifier("transactionManager") PlatformTransactionManager txManager) {
+                        @Qualifier("%s") JdbcTemplate jdbcTemplate,
+                        @Qualifier("%s") PlatformTransactionManager txManager) {
                     return new %sSkipListener(jdbcTemplate, txManager);
                 }
 
@@ -573,9 +614,9 @@ public class BatchGenerator {
                 @Bean
                 public Step %sWorkerStep(
                         JobRepository jobRepository,
-                        @Qualifier("transactionManager") PlatformTransactionManager txManager,
+                        @Qualifier("%s") PlatformTransactionManager txManager,
                         %sProcessor processor,
-                        %sWriter writer,
+                        %s writer,
                         %sSkipListener skipListener) {
                     Map<Class<? extends Throwable>, Boolean> skippable = new HashMap<>();
                     skippable.put(IllegalArgumentException.class, true);
@@ -606,22 +647,23 @@ public class BatchGenerator {
                 }
             }
             """.formatted(
-                c.basePackage, c.basePackage, c.baseName,
-                c.basePackage, c.model.getSimpleName(),
-                c.basePackage, c.basePackage, c.baseName,
-                file ? "import " + c.basePackage + ".reader.LineRange" + c.baseName + "Reader;"
-                     : "import " + c.basePackage + ".reader." + c.baseName + "DbItemReader;",
+                c.basePackage,
                 c.basePackage, c.baseName,
+                c.basePackage, c.model.getSimpleName(),
+                c.basePackage,
+                c.basePackage, c.baseName,
+                readerImport,
+                c.basePackage, writerClass,
                 c.baseName,
                 var, var, var, var,
                 var, var,
-                c.baseName, var, c.baseName, var,
+                c.baseName, var, c.jdbcTemplateBean, c.transactionManagerBean, c.baseName,
                 readerBean,
-                var, c.baseName, c.baseName, c.baseName,
+                var, c.transactionManagerBean, c.baseName, writerClass, c.baseName,
                 var, c.model.getSimpleName(), c.model.getSimpleName(),
-                var, file ? ", null" : "",
+                var, c.isFile() ? ", null" : "",
                 partitionerBean,
-                var, jobStart, var, jobBean);
+                var, jobStart, var, jobBeanStart);
     }
 
     private static String sqlTemplate(GeneratorContext c) {
@@ -645,8 +687,6 @@ public class BatchGenerator {
             """.formatted(c.tableName, cols, camelToSnake(c.keyField),
                           c.tableName, camelToSnake(c.keyField));
     }
-
-    // ---------- Utilitaires ----------
 
     static String camelToSnake(String s) {
         return s.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase();
